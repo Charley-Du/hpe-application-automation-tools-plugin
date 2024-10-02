@@ -145,4 +145,16 @@ public class GitFetchUtils {
         }
     }
 
+    public static String getCredentialsPassword(StandardCredentials credentials) {
+        if (credentials == null) {
+            return "";
+        } else if (credentials instanceof StringCredentials) {
+            return ((StringCredentials) credentials).getSecret().getPlainText();
+        } else if (credentials instanceof StandardUsernamePasswordCredentials) {
+            return ((StandardUsernamePasswordCredentials) credentials).getPassword().getPlainText();
+        } else {
+            return "";
+        }
+    }
+
 }
