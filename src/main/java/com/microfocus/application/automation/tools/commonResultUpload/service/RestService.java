@@ -71,6 +71,11 @@ public class RestService {
         return createAlmEntityRequest.perform(restPrefix, valueMap);
     }
 
+    public Map<String, Map<String, String>> bulkCreate(String restPrefix, Map<String, Map<String, String>> valueMap) {
+        //udt.translate(restPrefix, valueMap);
+        return createAlmEntityRequest.bulkCreate(restPrefix, valueMap);
+    }
+
     public List<Map<String, String>> get(String id, String restPrefix, String queryString) {
         return getAlmEntityRequest.perform(id, restPrefix, queryString);
     }

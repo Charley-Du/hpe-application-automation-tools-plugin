@@ -36,6 +36,7 @@ import com.microfocus.application.automation.tools.commonResultUpload.CommonUplo
 import com.microfocus.application.automation.tools.commonResultUpload.service.CustomizationService;
 import com.microfocus.application.automation.tools.commonResultUpload.service.RestService;
 import com.microfocus.application.automation.tools.commonResultUpload.service.RunStatusResolver;
+import com.microfocus.application.automation.tools.commonResultUpload.xmlreader.configloader.RunStatusMapLoader;
 import com.microfocus.application.automation.tools.results.service.AttachmentUploadService;
 import com.microfocus.application.automation.tools.results.service.almentities.AlmCommonProperties;
 import com.microfocus.application.automation.tools.results.service.almentities.AlmRun;
@@ -44,16 +45,19 @@ import com.microfocus.application.automation.tools.results.service.almentities.I
 import org.apache.commons.lang.StringUtils;
 import com.microfocus.application.automation.tools.sse.sdk.Base64Encoder;
 
-import java.util.Calendar;
-import java.util.GregorianCalendar;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import static com.microfocus.application.automation.tools.commonResultUpload.ParamConstant.ACTUAL_USER;
+import static com.microfocus.application.automation.tools.commonResultUpload.ParamConstant.RUN_STATUS_MAPPING;
 
 public class RunUploader {
 
     public static final String RUN_PREFIX = "runs";
+    public static final String RUN_STEP_PREFIX = "run-steps";
+    public static final String DESSTEP_REST_PREFIX = "design-steps";
     private static final String RUN_VERSION_MAP_NAME = "udf|Run On Version";
     private static final String VC_VERSION_NUMBER = "vc-version-number";
 
@@ -73,13 +77,22 @@ public class RunUploader {
         this.runStatusMapping = runStatusMapping;
     }
 
-    public void upload(Map<String, String> testset, Map<String, String> test,
-                       Map<String, String> testconfig, Map<String, String> testinstance,
-                       Map<String, String> run) {
+    public void upload(Map<String, String> testset,
+                       Map<String, String> test,
+                       Map<String, String> testconfig,
+                       Map<String, String> testinstance,
+                       Map<String, String> run,
+                       boolean isNew) {
 
         // Get attachment info and remove
         String attachment = run.get("attachment");
         run.remove("attachment");
+
+        String stepMessage = run.get("stepMessage");
+        run.remove("stepMessage");
+
+        String stepRegEx = run.get("stepRegEx");
+        run.remove("stepRegEx");
 
         // Set relations
         run.put(AlmRun.RUN_CONFIG_ID, testconfig.get(AlmCommonProperties.ID));
@@ -105,11 +118,13 @@ public class RunUploader {
         // Update test instance status
         String runstatus = RunStatusResolver.getRunStatus(run.get(AlmRun.RUN_STATUS), runStatusMapping);
 
+        String runId = null;
+
         if (StringUtils.isNotEmpty(runstatus)) {
             // Create a run without status
             run.remove(AlmRun.RUN_STATUS);
             Map<String, String> createdRun = restService.create(RUN_PREFIX, run);
-
+            runId = createdRun.get(AlmCommonProperties.ID);
             // Update status of the run
             Map<String, String> updateRun = new HashMap<>();
             updateRun.put(AlmCommonProperties.ID, createdRun.get(AlmCommonProperties.ID));
@@ -137,10 +152,60 @@ public class RunUploader {
 
         } else {
             Map<String, String> createdRun = restService.create(RUN_PREFIX, run);
+            runId = createdRun.get(AlmCommonProperties.ID);
             if (StringUtils.isNotEmpty(attachment)) {
                 AttachmentUploadService.getInstance().upload(attachment, RUN_PREFIX, createdRun.get("id"));
             }
         }
+        if (stepMessage!=null
+                && stepMessage.trim().length()>0
+                && stepRegEx!=null
+                && stepRegEx.trim().length()>0) {
+            Map<String,String> stepStatus = RunStatusMapLoader.load(this.params.get(RUN_STATUS_MAPPING),logger).getStepStatus();
+            if (stepStatus!=null && stepStatus.size() > 0) {
+                List<StepBean> stepBeans = new UploaderHelper(stepMessage, stepRegEx, stepStatus).parseMessage();
+                if (stepBeans!=null && stepBeans.size()>0) {
+                    restService.bulkCreate(RUN_STEP_PREFIX, buildRunStepBody(stepBeans,runId));
+                    if (isNew) {
+                        restService.bulkCreate(DESSTEP_REST_PREFIX, buildDesStepBody(stepBeans,test.get(AlmCommonProperties.ID)));
+                    }
+                } else {
+                    logger.info("No any run steps to be detected.");
+                }
+            }
+        } else {
+            logger.info("Please make sure you've configured 'stepRegEx','stepMessage' and 'stepstatus' correctly if you want to upload run steps.");
+        }
+    }
+
+    private Map<String, Map<String, String>> buildDesStepBody(List<StepBean> stepBeans, String testId) {
+        Map<String, Map<String, String>> stepBody = new LinkedHashMap<String, Map<String, String>>();
+        for (StepBean stepBean : stepBeans) {
+            Map<String,String> step = new HashMap<>();
+            step.put("step-order","" + stepBean.getOrder());
+            step.put("name","Step " + stepBean.getOrder());
+            step.put("parent-id",testId);
+            step.put("expected","n/a");
+            step.put("description",stepBean.getStepName());
+            stepBody.put(stepBean.getStepName(), step);
+        }
+        return stepBody;
+    }
+
+    private Map<String, Map<String, String>> buildRunStepBody(List<StepBean> stepBeans, String runId) {
+        Map<String, Map<String, String>> stepBody = new LinkedHashMap<String, Map<String, String>>();
+        for (StepBean stepBean : stepBeans) {
+            Map<String,String> step = new HashMap<>();
+            step.put("step-order","" + stepBean.getOrder());
+            step.put("name","Step " + stepBean.getOrder());
+            step.put("parent-id",runId);
+            step.put("expected","n/a");
+            step.put("description",stepBean.getStepName());
+            step.put("status",stepBean.getStatus());
+            step.put("actual",stepBean.getActualValue());
+            stepBody.put(stepBean.getStepName(), step);
+        }
+        return stepBody;
     }
 
     private String convertDetail(String detail) {
