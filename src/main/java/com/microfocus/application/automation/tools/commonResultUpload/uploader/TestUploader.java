@@ -46,6 +46,7 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 
 import static com.microfocus.application.automation.tools.commonResultUpload.ParamConstant.*;
+import static com.microfocus.application.automation.tools.results.service.AlmRestTool.getEncodedString;
 
 public class TestUploader {
 
@@ -161,7 +162,7 @@ public class TestUploader {
         Map<String, String> newTest = null;
         String testName = test.get(AlmCommonProperties.NAME);
         for (int i = 0; i < triedTimes; i++) {
-            String query = String.format("fields=id,name&query={parent-id[%s];name[%s]}",test.get(AlmCommonProperties.PARENT_ID),testName);
+            String query = String.format("fields=id,name&query={parent-id[%s];name[%s]}",test.get(AlmCommonProperties.PARENT_ID),getEncodedString(testName));
             List<Map<String, String>> tests = restService.get(null, TEST_REST_PREFIX, query);
             if (tests != null && tests.size() > 0) {
                 logger.log("Test[" + testName + "] already exists.");
