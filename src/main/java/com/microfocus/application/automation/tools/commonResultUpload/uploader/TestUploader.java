@@ -44,6 +44,8 @@ import org.apache.commons.lang.StringUtils;
 
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static com.microfocus.application.automation.tools.commonResultUpload.ParamConstant.*;
 import static com.microfocus.application.automation.tools.results.service.AlmRestTool.getEncodedString;
@@ -56,7 +58,7 @@ public class TestUploader {
             "LEANFT-TEST", "LR-SCENARIO", "QAINSPECT-TEST"};
     private static final String VC_VERSION_NUMBER = "vc-version-number";
     private static final String SUB_TYPE_ID = "subtype-id";
-    private static final int triedTimes = 10;
+    private static final int triedTimes = 30;
 
     private Map<String, String> params;
     private CommonUploadLogger logger;
@@ -90,6 +92,7 @@ public class TestUploader {
             test.remove("attachment");
 
             boolean isNew = false;
+            boolean isUpdate = false;
 
             if (!StringUtils.isEmpty(params.get(ALM_TEST_FOLDER))) {
                 // Create or find a exists folder
@@ -108,9 +111,13 @@ public class TestUploader {
                     if (xmlResultEntity.getSubEntities().size() > 0) {
                         Map<String,String> runFieldsMap = xmlResultEntity.getSubEntities().get(0).getValueMap();
                         if (runFieldsMap != null && runFieldsMap.containsKey("stepMessage")) {
-                            test.put(AlmCommonProperties.PARENT_ID, folder.get(AlmCommonProperties.ID));
-                            newTest = createNewTest(test);
-                            isNew = true;
+                            if (params.get(UPDATE_DESSTEPS).equals("true")) {
+                                isUpdate = true;
+                            } else {
+                                test.put(AlmCommonProperties.PARENT_ID, folder.get(AlmCommonProperties.ID));
+                                newTest = createNewTest(test);
+                                isNew = true;
+                            }
                         }
                     }
                     if (!isNew) {
@@ -153,7 +160,7 @@ public class TestUploader {
                 // upload test instance
                 getVersionNumberForVC(newTest);
                 test.putAll(newTest);
-                testInstanceUploader.upload(testset, xmlResultEntity, attachment, isNew);
+                testInstanceUploader.upload(testset, xmlResultEntity, attachment, isNew||isUpdate);
             }
         }
     }
@@ -166,7 +173,7 @@ public class TestUploader {
             List<Map<String, String>> tests = restService.get(null, TEST_REST_PREFIX, query);
             if (tests != null && tests.size() > 0) {
                 logger.log("Test[" + testName + "] already exists.");
-                testName = buildNewTestName(testName,i);
+                testName = buildNewTestName(testName);
             } else {
                 test.put(AlmCommonProperties.NAME,testName);
                 newTest = restService.create(TEST_REST_PREFIX, test);
@@ -176,11 +183,22 @@ public class TestUploader {
         return newTest;
     }
 
-    private String buildNewTestName(String testName,int i) {
+    private String buildNewTestName(String testName) {
         Date currentDate = new Date();
         SimpleDateFormat formatter = new SimpleDateFormat("yyyyMMdd");
         String formattedDate = formatter.format(currentDate);
-        return testName + "_Copy_" + i + "_" + formattedDate;
+
+        String suffixPattern = "_Copy_(\\d+)_" + formattedDate + "$";
+        Pattern pattern = Pattern.compile(suffixPattern);
+        Matcher matcher = pattern.matcher(testName);
+        if (matcher.find()) {
+            int index = Integer.parseInt(matcher.group(1)) + 1;
+            String newSuffix = "_Copy_" + index + "_" + formattedDate;
+            testName = testName.replace(matcher.group(0), newSuffix);
+        } else {
+            testName = testName + "_Copy_0_" + formattedDate;
+        }
+        return testName;
     }
 
     private void getVersionNumberForVC(Map<String, String> newTest) {

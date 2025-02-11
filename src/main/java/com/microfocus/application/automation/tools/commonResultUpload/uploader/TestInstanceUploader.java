@@ -69,7 +69,7 @@ public class TestInstanceUploader {
         this.customizationService = customizationService;
     }
 
-    public void upload(Map<String, String> testset, XmlResultEntity xmlResultEntity, String attachment, boolean isNew) {
+    public void upload(Map<String, String> testset, XmlResultEntity xmlResultEntity, String attachment, boolean isCreateDesStep) {
         Map<String, String> test = xmlResultEntity.getValueMap();
         Map<String, String> testconfig = getMainTestConfig(test);
         Map<String, String> testinstance;
@@ -95,7 +95,7 @@ public class TestInstanceUploader {
                             testconfig,
                             testinstance,
                             xmlResultEntity.getSubEntities().get(0).getValueMap(),
-                            isNew);
+                            isCreateDesStep);
                 } else {
                     logger.info("No run is found for test: " + test.get("name"));
                 }

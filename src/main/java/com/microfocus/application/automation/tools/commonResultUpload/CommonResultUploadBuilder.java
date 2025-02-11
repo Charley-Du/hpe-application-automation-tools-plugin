@@ -77,7 +77,8 @@ public class CommonResultUploadBuilder extends Recorder implements SimpleBuildSt
             String clientType, String almProject, String almTestFolder,
             String almTestSetFolder, String testingResultFile,
             String runStatusMapping, String fieldMapping,
-            boolean createNewTest) {
+            boolean createNewTest,
+            boolean updateDesSteps) {
 
         this.almServerName = almServerName;
         this.credentialsId = credentialsId;
@@ -90,6 +91,7 @@ public class CommonResultUploadBuilder extends Recorder implements SimpleBuildSt
         this.runStatusMapping = runStatusMapping;
         this.fieldMapping = fieldMapping;
         this.createNewTest = createNewTest;
+        this.updateDesSteps = updateDesSteps;
     }
 
     @Override
@@ -120,6 +122,7 @@ public class CommonResultUploadBuilder extends Recorder implements SimpleBuildSt
         params.put(TESTING_RESULT_FILE, Util.replaceMacro(testingResultFile, varResolver));
         params.put(FIELD_MAPPING, Util.replaceMacro(fieldMapping, varResolver));
         params.put(CREATE_NEW_TEST, String.valueOf(createNewTest));
+        params.put(UPDATE_DESSTEPS, String.valueOf(updateDesSteps));
 
         Uploader uploader = new Uploader(run, workspace, logger, params);
         uploader.upload();
@@ -302,7 +305,7 @@ public class CommonResultUploadBuilder extends Recorder implements SimpleBuildSt
             return "status:\n" +
                     "  Passed: \"==True\" # If status attribute is \"True\" in report, the run in ALM will be marked as \"Passed\". Else will be \"Failed\".\n" +
                     "  #Failed: \">=0\" # If status attribute value greater or equals than 0, then run in ALM will be marked as \"Failed\".  \n" +
-                    "  #Passed condition and Failed condition are mutural exclusion." ;
+                    "  #Passed condition and Failed condition are mutual exclusion." ;
         }
     }
 
@@ -317,6 +320,15 @@ public class CommonResultUploadBuilder extends Recorder implements SimpleBuildSt
     private String runStatusMapping;
     private String fieldMapping;
     private boolean createNewTest;
+    private boolean updateDesSteps;
+
+    public boolean isUpdateDesSteps() {
+        return updateDesSteps;
+    }
+
+    public void setUpdateDesSteps(boolean updateDesSteps) {
+        this.updateDesSteps = updateDesSteps;
+    }
 
     public String getAlmServerName() {
         return almServerName;

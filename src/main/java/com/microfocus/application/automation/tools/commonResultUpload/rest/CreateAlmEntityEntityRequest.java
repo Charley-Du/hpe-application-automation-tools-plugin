@@ -82,14 +82,17 @@ public class CreateAlmEntityEntityRequest extends BasicPostEntityRequest {
                 entityBuilder.append(RestXmlUtils.fieldXml(entity.getKey(), StringEscapeUtils.escapeXml10(entity.getValue())));
             }
             entityBuilder.append("</Fields></Entity>");
-            builder.append(entityBuilder.toString());
+            builder.append(entityBuilder);
         }
         builder.append("</Entities>");
-        logger.info("Request body: " + builder.toString());
+        logger.info("Request body: " + builder);
         return builder.toString().getBytes();
     }
 
     private Map<String, Map<String, String>> handleBulkResult(Response response, Map<String, Map<String, String>> valueMap, String restPrefix) {
+        if (response.getFailure() !=null) {
+            throw new RuntimeException("Got invalid response from Server, see details: [" + response + "]");
+        }
         return null;
     }
 }
